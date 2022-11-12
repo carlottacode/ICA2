@@ -33,7 +33,9 @@ cmd =f"showalign -order S -show S -sequence clustalo.out -outfile {output_file}.
 subprocess.call(cmd, shell=True)
 
 #Plotcon
-cmd = "plotcon -winsize 4 -sequence clustalo.out -graph svg"
+cmd = "plotcon -winsize 4 -sequence clustalo.out -auto -graph x11"
+subprocess.call(cmd, shell=True)
+
 
 #Patmotif
 cmd = "patmatmotif "
