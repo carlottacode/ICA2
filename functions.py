@@ -34,7 +34,8 @@ in the accepted format\n---\n')
 # =============================================================================
 def enter_protein():
         while True:
-                protein_family=input("\nWhat protein family are you interested in?\n".center(123, '#')).lower()
+            
+                protein_family=input("\n###\nWhat protein family are you interested in?\n###\n").lower()
                 #protein_family = 'pyruvate dehydrogenase'
                 
                 if protein_family[-1] == 's':
@@ -49,20 +50,23 @@ def enter_protein():
                 protein_results = int(line[9:-9])
                 
                 if protein_results == 0:
+                    print('\n')
                     print(f"\nHi there! Your protein (>{protein_family}<) \
 didn\'t return any results from NCBI...\nThis means you might have made a typo... \n\
-Please try again!\n".center(123, '-'))
+Please try again!\n".center(350, '-'))
                               
                 elif 1<= protein_results <= 2:
+                    print('\n')
                     print(f'\nHi ! NCBI returned >{protein_results}< which \
 isn\'t enough for the subsequent analysis. I\'m sorry about this... \n\
-Please try again!\n'.center(123, '-'))
+Please try again!\n'.center(350, '-'))
                         
                 elif protein_results > 2 :
-                        print(f"\nLuckily for you NCBI has returned \
->{line[9:-9]}< sequence results for your protein family (>{protein_family}<)!\n".center(123, '-'))
+                    print('\n')
+                    print(f"\nLuckily for you NCBI has returned >{line[9:-9]}< \
+sequence results for your protein family (>{protein_family}<)!\n".center(350, '-'))
     
-                        break
+                    break
                 else:
                     print("Something isn't working please try again...")
         
@@ -78,10 +82,8 @@ Please try again!\n'.center(123, '-'))
 # =============================================================================
 def enter_organism(protein):
         while True:
-                taxonomic_subset=input("\nWhat taxonomic subset do you wish to investigate?\n".center(123, '#')).lower()
+                taxonomic_subset=input("\n###\nWhat taxonomic subset do you wish to investigate?\n###\n").lower()
                 #taxonomic_subset='ascomycete fungi'
-                
-                
                 
                 efilter_cmd = f'esearch -db protein -query "{protein}[PROT]"\
                     |efilter -organism "{taxonomic_subset}"|grep "Count"'
@@ -90,31 +92,36 @@ def enter_organism(protein):
                 prot_tax_results = int(line[9:-9])
                 
                 if prot_tax_results == 0:
+                    print('\n')
                     print(f"\nHello, your combination of >{taxonomic_subset}< \
-and >{protein}< didn\'t return any results from NCBI... This means you might \
-have made a typo... Please try entering the taxonomic subgroup again!\n".center(123, '-'))
+and >{protein}< didn\'t return any results from NCBI...\nThis means you might \
+have made a typo...\nPlease try entering the taxonomic subgroup again!\n".center(350, '-'))
                     
                     if yes_or_no('Would you like to enter a different protein family?') == 'y':
                         protein = enter_protein()
                               
                 elif 1 <= prot_tax_results <= 2:
+                    print('\n')
                     print(f'\nHi ! NCBI returned >{line[9:-9]}< which isn\'t \
-enough for the subsequent analysis.I\'m sorry about this...\n Please try again!\n'.center(123, '-'))
+enough for the subsequent analysis.I\'m sorry about this...\n Please try again!\n'.center(350, '-'))
                     
                     if yes_or_no('Would you like to enter a different protein family?') == 'y':
                         protein = enter_protein()
                     
                 elif 2 < prot_tax_results < 1000:
-                        print(f'\nThis program has found >{line[9:-9]}< results \
-within your specified taxa sub-group. We can now continue with the analysis...\n'.center(123, '-'))
-                        break
+                    print('\n')
+                    print(f'\nThis program has found >{line[9:-9]}< results \
+within your specified taxa sub-group. We can now continue with the analysis...\n'.center(350, '-'))
+                    break
                         
                 elif prot_tax_results >= 1000:
+                    print('\n')
                     print('\nThis is a lot of sequences to get from NCBI and \
-so this may take a while...\n'.center(123, '-')) 
+so this may take a while...\n'.center(200, '-')) 
                           
                     if yes_or_no('Would you still like to continue?') == 'y':
-                        print('\nMake yourself a cup of tea!\n'.center(123, '-'))
+                        print('\n')
+                        print('\nMake yourself a cup of tea!\n'.center(100, '-'))
                         break
                     
                     elif yes_or_no('Would you like to enter a different protein family?')=='y':
@@ -126,7 +133,9 @@ so this may take a while...\n'.center(123, '-'))
         return protein, taxonomic_subset
 
 
-
+# =============================================================================
+# SPECIES
+# =============================================================================
 
 def species(protein, organism):
         try:
@@ -148,11 +157,12 @@ def species(protein, organism):
                 species_subset.append(line.split('[')[1][:-1])
                 
             species_number = len(set(species_subset))
+            species_set = set(species_subset)
             
         except:
             print('SPECIES FUNCTION')
         
-        return species_number
+        return lines, species_number, species_set
 
 # =============================================================================
 # PROGRAM 
@@ -161,24 +171,47 @@ def species(protein, organism):
 def user_input():
     try:
         while True:
+            subprocess.call('clear', shell=True)
             prot=enter_protein()
             prot2, orgn=enter_organism(prot)    
             
-            num1 = species(prot2, orgn)
+            headers, num_spec, set_spec = species(prot2, orgn)
         
-            print(f'\nAccording to my records and the taxonomic subgroup you specified \
-you want to look at the conservation of >{prot2}s< in >{num1}< different \
-species... Please be aware with a large number of species in your analysis you \
-may not get any cool or fun results...\n'.center(123, '-'))
+            print(f'\nAccording to your input you want to look at the \
+conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
+with many different species in your analysis you may not get very satisfactory\
+ conservation results...\n'.center(400, '-'))
             
-            if yes_or_no(f'Baring this in mind, would you like to continue with \
->{num1}< species?') == 'y':
+            if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
+                for i in set_spec:
+                    print(i)
+            
+            if yes_or_no(f'With this in mind, would you like to continue with \
+>{num_spec}< species?') == 'y':
 
-                print('...')
-                return prot2, orgn
+                print('\nYay! Let\'s continue with the analysis...\n'.center(200, '~'))
+                return headers, prot2, orgn
+            
             else:
                 if yes_or_no('Would you like to start again?') == 'n':
+                    print('\nexiting...\n'.center(200, '~'))
                     break
+                else:
+                    print('\nStarting again...\n'.center(200, '~'))
+                    
     except:
         print('USER INPUT FUNCTION')
         
+
+def choose_from_dict(question, dictionary):
+    while True:
+        num_choice=input("\n###\n"+question+"\n###\n")
+        
+        valid_integers = list(dictionary.keys())
+        
+        if int(num_choice) in valid_integers:
+            break
+        else:
+            print('\nYou have not enetered a valid number\nTry again!\n'.center(300,'-'))
+    return num_choice, dictionary[int(num_choice)]
+
