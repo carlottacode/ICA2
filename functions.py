@@ -27,6 +27,7 @@ def yes_or_no(question):
             print('\n---\nI\'m sorry I don\'t understand... Please enter y/n \
 in the accepted format\n---\n')
             
+
 # =============================================================================
 # This function asks the user to enter a protein family of interest. It will 
 # not allow the user to continue unless the protein family returns sequences
@@ -43,7 +44,7 @@ def enter_protein():
                   
                 #Checking that the protein family returns results from NCBI if not then 
                 #there may be spelling mistakes 
-                esearch_cmd = f'esearch -db protein -query \
+                esearch_cmd = f'esearch -db IPG -query \
                     "{protein_family}[PROT]" | grep "Count"'
                 
                 line =  subprocess.check_output(esearch_cmd, shell=True).decode("utf-8")
@@ -64,7 +65,7 @@ Please try again!\n'.center(350, '-'))
                 elif protein_results > 2 :
                     print('\n')
                     print(f"\nLuckily for you NCBI has returned >{line[9:-9]}< \
-sequence results for your protein family (>{protein_family}<)!\n".center(350, '-'))
+sequence results for your protein family (>{protein_family}<)!\n".center(300, '-'))
     
                     break
                 else:
@@ -85,8 +86,8 @@ def enter_organism(protein):
                 taxonomic_subset=input("\n###\nWhat taxonomic subset do you wish to investigate?\n###\n").lower()
                 #taxonomic_subset='ascomycete fungi'
                 
-                efilter_cmd = f'esearch -db protein -query "{protein}[PROT]"\
-                    |efilter -organism "{taxonomic_subset}"|grep "Count"'
+                efilter_cmd = f'esearch -db IPG -query "{protein}[PROT]\
+                    AND {taxonomic_subset}[ORGN]"|grep "Count"'
                 
                 line =  subprocess.check_output(efilter_cmd, shell=True).decode("utf-8")
                 prot_tax_results = int(line[9:-9])
@@ -132,55 +133,96 @@ so this may take a while...\n'.center(200, '-'))
                                         
         return protein, taxonomic_subset
 
-
 # =============================================================================
-# SPECIES
+# Getting rid of partial sequences
 # =============================================================================
-
-def species(protein, organism):
-        try:
-            sequence_cmd =f'esearch -db protein -query "{protein}[PROT]"|efilter -organism "{organism}"\
-            |efetch -format fasta>file1'
-                
-            subprocess.call(sequence_cmd, shell=True)
-              
+def prune_seq(protein, organism):
     
-            fasta_header_cmd = "grep '>' file1 > headers.txt"
-            subprocess.call(fasta_header_cmd, shell=True)
+    print('\nRetrieving sequences...\n'.center(120, '-'))
+    
+    sequence_cmd =f'esearch -db protein -query "{protein}[PROT] AND {organism}[ORGN]"\
+    |efetch -format fasta>file1'
         
+    subprocess.call(sequence_cmd, shell=True)
+    
+    print('\nPruning sequences...\n'.center(120, '-'))
+    
+    fasta_header_cmd = "grep '>' file1 > headers.txt"
+    subprocess.call(fasta_header_cmd, shell=True)
+    
+    partial_cmd = 'grep -v "partial" headers.txt | cut --complement -c 1 > headers_wo_partial.txt'
+    subprocess.call(partial_cmd, shell=True)
         
-            with open('headers.txt') as myfile:
-                lines = [line.rstrip() for line in myfile]
+    pullseq_cmd = './pullseq -i file1 -n headers_wo_partial.txt > file_wo_partial'
+    subprocess.call(pullseq_cmd, shell=True)
+        
+    count_cmd = 'seqcount file_wo_partial -outfile seqcount.out'
+    subprocess.call(count_cmd, shell=True)
+        
+    cat_cmd = 'cat seqcount.out'
+    count = subprocess.check_output(cat_cmd, shell=True)
+    
+    if int(count) > 2:
+        
+        return(int(count))
             
-            species_subset = []
-            for line in lines:
-                species_subset.append(line.split('[')[1][:-1])
-                
-            species_number = len(set(species_subset))
-            species_set = set(species_subset)
+    else:
+        print('\nI am so sorry it seems that after removing partial sequences returned by NCBI \
+we don\'t have enough sequences to do a multiple alignment...\n'.center(350, '-'))
             
-        except:
-            print('SPECIES FUNCTION')
-        
-        return lines, species_number, species_set
-
+        if yes_or_no('Would you like to start again?') == 'n':
+            print('\nexiting...\n'.center(250, '~'))
+            
+        else:
+            print('\nStarting again...\n'.center(250, '~'))
+            user_input()
+            
 # =============================================================================
-# PROGRAM 
+# Number of species        
+# =============================================================================
+def species():
+    
+    with open('headers_wo_partial.txt') as myfile:
+        lines = [line.rstrip() for line in myfile]
+    
+    species_subset = []
+    
+    
+    for line in lines:
+        species_subset.append(line.split('[')[1][:-1])
+    
+    species_number = len(set(species_subset))
+    species_set = set(species_subset)
+    
+    return lines, species_number, species_set
+    
+            
+# =============================================================================
+# program order
 # =============================================================================
 
 def user_input():
     try:
         while True:
-            subprocess.call('clear', shell=True)
+#            subprocess.call('clear', shell=True)
             prot=enter_protein()
-            prot2, orgn=enter_organism(prot)    
+            prot2, orgn=enter_organism(prot)
             
-            headers, num_spec, set_spec = species(prot2, orgn)
+            try:
+            
+                number = prune_seq(prot2, orgn)
+            except:
+                print('prune_seq')
+                
+            try:
+                headers, num_spec, set_spec = species()
+            except:
+                print('species')
         
             print(f'\nAccording to your input you want to look at the \
 conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
 with many different species in your analysis you may not get very satisfactory\
- conservation results...\n'.center(400, '-'))
+ conservation results...\n'.center(450, '-'))
             
             if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
                 for i in set_spec:
@@ -190,19 +232,22 @@ with many different species in your analysis you may not get very satisfactory\
 >{num_spec}< species?') == 'y':
 
                 print('\nYay! Let\'s continue with the analysis...\n'.center(200, '~'))
+                
                 return headers, prot2, orgn
             
             else:
                 if yes_or_no('Would you like to start again?') == 'n':
-                    print('\nexiting...\n'.center(200, '~'))
+                    print('\nexiting...\n'.center(250, '~'))
                     break
                 else:
-                    print('\nStarting again...\n'.center(200, '~'))
+                    print('\nStarting again...\n'.center(250, '~'))
                     
     except:
         print('USER INPUT FUNCTION')
-        
 
+# =============================================================================
+# CHOOSING SEQUENCES FROM dict for PATMATMOTIF        
+# =============================================================================
 def choose_from_dict(question, dictionary):
     while True:
         num_choice=input("\n###\n"+question+"\n###\n")
@@ -215,3 +260,8 @@ def choose_from_dict(question, dictionary):
             print('\nYou have not enetered a valid number\nTry again!\n'.center(300,'-'))
     return num_choice, dictionary[int(num_choice)]
 
+
+
+
+
+    
