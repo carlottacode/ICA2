@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov 18 19:42:25 2022
+
+@author: lotta
+"""
+
 #!/usr/bin/python3
 import os, sys, subprocess
 import numpy as np
@@ -170,12 +177,7 @@ def prune_seq(protein, organism):
         print('\nI am so sorry it seems that after removing partial sequences returned by NCBI \
 we don\'t have enough sequences to do a multiple alignment...\n'.center(350, '-'))
             
-        if yes_or_no('Would you like to start again?') == 'n':
-            print('\nexiting...\n'.center(250, '~'))
-            
-        else:
-            print('\nStarting again...\n'.center(250, '~'))
-            user_input()
+        return(int(count))
             
 # =============================================================================
 # Number of species        
@@ -195,55 +197,7 @@ def species():
     species_set = set(species_subset)
     
     return lines, species_number, species_set
-    
-            
-# =============================================================================
-# program order
-# =============================================================================
 
-def user_input():
-    try:
-        while True:
-#            subprocess.call('clear', shell=True)
-            prot=enter_protein()
-            prot2, orgn=enter_organism(prot)
-            
-            try:
-            
-                number = prune_seq(prot2, orgn)
-            except:
-                print('prune_seq')
-                
-            try:
-                headers, num_spec, set_spec = species()
-            except:
-                print('species')
-        
-            print(f'\nAccording to your input you want to look at the \
-conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
-with many different species in your analysis you may not get very satisfactory\
- conservation results...\n'.center(450, '-'))
-            
-            if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
-                for i in set_spec:
-                    print(i)
-            
-            if yes_or_no(f'With this in mind, would you like to continue with \
->{num_spec}< species?') == 'y':
-
-                print('\nYay! Let\'s continue with the analysis...\n'.center(200, '~'))
-                
-                return headers, prot2, orgn
-            
-            else:
-                if yes_or_no('Would you like to start again?') == 'n':
-                    print('\nexiting...\n'.center(250, '~'))
-                    break
-                else:
-                    print('\nStarting again...\n'.center(250, '~'))
-                    
-    except:
-        print('USER INPUT FUNCTION')
 
 # =============================================================================
 # CHOOSING SEQUENCES FROM dict for PATMATMOTIF        
@@ -260,6 +214,57 @@ def choose_from_dict(question, dictionary):
             print('\nYou have not enetered a valid number\nTry again!\n'.center(300,'-'))
     return num_choice, dictionary[int(num_choice)]
 
+
+
+    
+            
+# =============================================================================
+# program order
+# =============================================================================
+
+def user_input():
+    try:
+        while True:
+            subprocess.call('clear', shell=True)
+            prot=enter_protein()
+            prot2, orgn=enter_organism(prot)
+            
+            number = prune_seq(prot2, orgn)
+            headers, num_spec, set_spec = species()
+            
+            if number > 2 :
+                
+                print(f'\nAccording to your input you want to look at the \
+    conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
+    with many different species in your analysis you may not get very satisfactory\
+     conservation results...\n'.center(450, '-'))
+                
+                if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
+                    for i in set_spec:
+                        print(i)
+                
+                if yes_or_no(f'With this in mind, would you like to continue with \
+    >{num_spec}< species?') == 'y':
+                    print('\nYay! Let\'s continue with the analysis...\n'.center(250, '~'))
+                    return headers, prot2, orgn
+                    break 
+                
+                else:
+                    if yes_or_no('Would you like to start again?') == 'n':
+                        print('\nexiting...\n'.center(250, '~'))
+                        break
+                    else:
+                        print('\nStarting again...\n'.center(250, '~'))
+                        
+            else:
+                if yes_or_no('Would you like to start again?') == 'n':
+                    print('\nexiting...\n'.center(250, '~'))
+                    break
+                else:
+                    print('\nStarting again...\n'.center(250, '~'))
+                    
+    except:
+        print('USER INPUT FUNCTION')
 
 
 

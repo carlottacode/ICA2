@@ -10,7 +10,7 @@ from functions import yes_or_no
 from functions import species
 from functions import user_input
 from functions import choose_from_dict
-from functions import seq_prune
+from functions import prune_seq
 
 import pprint
 
@@ -72,7 +72,6 @@ try:
 
     #Our fasta file containing all our sequences is called file1
     #we could use pullseq here to filter out shorter sequences?
-    seq_prune()    
     
     if yes_or_no(f'Would you like to align the sequences you retrived from NCBI\
 for {prot} in {orgn}?') == 'y':
