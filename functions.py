@@ -1,17 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov 18 19:42:25 2022
-
-@author: lotta
-"""
-
 #!/usr/bin/python3
 import os, sys, subprocess
 import numpy as np
 import pandas as pd
 
 print('\n---\nWelcome to ICA2\n---\n')
-
+output_path = './prog_run/'
 
 # =============================================================================
 # This function allows you to ask a yes or no question which either returns a 
@@ -143,33 +136,31 @@ so this may take a while...\n'.center(200, '-'))
 # =============================================================================
 # Getting rid of partial sequences
 # =============================================================================
-def prune_seq(protein, organism):
+def prune_seq(protein, organism, path=output_path):
     
     print('\nRetrieving sequences...\n'.center(120, '-'))
     
     sequence_cmd =f'esearch -db protein -query "{protein}[PROT] AND {organism}[ORGN]"\
-    |efetch -format fasta>file1'
+    |efetch -format fasta>{path}file1'
         
     subprocess.call(sequence_cmd, shell=True)
     
     print('\nPruning sequences...\n'.center(120, '-'))
     
-    fasta_header_cmd = "grep '>' file1 > headers.txt"
+    fasta_header_cmd = f"grep '>' {path}file1 > {path}headers.txt"
     subprocess.call(fasta_header_cmd, shell=True)
     
-    partial_cmd = 'grep -v "partial" headers.txt | cut --complement -c 1 > headers_wo_partial.txt'
+    partial_cmd = f'grep -i -v "partial" {path}headers.txt | cut --complement -c 1 > {path}headers_wo_partial.txt'
     subprocess.call(partial_cmd, shell=True)
         
-    pullseq_cmd = './pullseq -i file1 -n headers_wo_partial.txt > file_wo_partial'
-    subprocess.call(pullseq_cmd, shell=True)
-        
-    count_cmd = 'seqcount file_wo_partial -outfile seqcount.out'
-    subprocess.call(count_cmd, shell=True)
-        
-    cat_cmd = 'cat seqcount.out'
-    count = subprocess.check_output(cat_cmd, shell=True)
-    
+    count_cmd = f'wc -l {path}headers_wo_partial.txt'
+    count = str(subprocess.check_output(count_cmd, shell=True))
+    count = count.split(' ')[0][2:]
+
     if int(count) > 2:
+        
+        pullseq_cmd = f'./pullseq -i {path}file1 -n {path}headers_wo_partial.txt > {path}file_wo_partial'
+        subprocess.call(pullseq_cmd, shell=True)
         
         return(int(count))
             
@@ -182,16 +173,23 @@ we don\'t have enough sequences to do a multiple alignment...\n'.center(350, '-'
 # =============================================================================
 # Number of species        
 # =============================================================================
-def species():
+def species(prot, orgn):
     
-    with open('headers_wo_partial.txt') as myfile:
+    species_cmd = f"esearch -db IPG -query '{prot}[PROT] AND {orgn}[ORGN]'|\
+        esummary|xtract -pattern DocumentSummary -element Organism"
+    
+    species_list = subprocess.check_output(species_cmd, shell=True)
+    print(species_list)
+    species_subset=species_list.split()
+    
+    with open(f'{output_path}headers_wo_partial.txt') as myfile:
         lines = [line.rstrip() for line in myfile]
     
-    species_subset = []
+    #species_subset = []
     
     
-    for line in lines:
-        species_subset.append(line.split('[')[1][:-1])
+    #for line in lines:
+    #    species_subset.append(line.split('[')[1][:-1])
     
     species_number = len(set(species_subset))
     species_set = set(species_subset)
@@ -213,10 +211,6 @@ def choose_from_dict(question, dictionary):
         else:
             print('\nYou have not enetered a valid number\nTry again!\n'.center(300,'-'))
     return num_choice, dictionary[int(num_choice)]
-
-
-
-    
             
 # =============================================================================
 # program order
@@ -230,21 +224,22 @@ def user_input():
             prot2, orgn=enter_organism(prot)
             
             number = prune_seq(prot2, orgn)
-            headers, num_spec, set_spec = species()
+            
+            headers, num_spec, set_spec = species(prot2, orgn)
             
             if number > 2 :
                 
                 print(f'\nAccording to your input you want to look at the \
-    conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
-    with many different species in your analysis you may not get very satisfactory\
-     conservation results...\n'.center(450, '-'))
+conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
+with many different species in your analysis you may not get very satisfactory\
+conservation results...\n'.center(450, '-'))
                 
                 if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
                     for i in set_spec:
                         print(i)
                 
                 if yes_or_no(f'With this in mind, would you like to continue with \
-    >{num_spec}< species?') == 'y':
+>{num_spec}< species?') == 'y':
                     print('\nYay! Let\'s continue with the analysis...\n'.center(250, '~'))
                     return headers, prot2, orgn
                     break 
@@ -268,5 +263,37 @@ def user_input():
 
 
 
+# =============================================================================
+# 
+# =============================================================================
+def check_num(max_len, min_len, question):
+      while True:
+        num_choice=input("\n###\n"+question+"\n###\n")
+        try:
+                num = int(num_choice)
+                if (min_len < int(num_choice) < max_len) == True:
+                      return num
 
+                else:
+                      print(f'\nThe sequence length you have entered is not in the correct range\
+                      should be between {max_len} and {min_len}\nTry again!\n'.center(300,'-')) 
+                
+                
+        except ValueError:
+                
+                try:
+                    num = float(num_choice)
+
+                    if (min_len < num < max_len) == True:
+                          return num
+                    else:
+                         print(f'\nThe sequence length you have entered is not in the correct range\
+                          should be between {max_len} and {min_len}\nTry again!\n'.center(300,'-'))
+
+                            
+                            
+                except ValueError:
+                    
+                    print('You have not entered a number, please enter a number...')
+              
     
