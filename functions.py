@@ -2,14 +2,48 @@
 import os, sys, subprocess
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import pprint
+import textwrap
 
 print('\n---\nWelcome to ICA2\n---\n')
 output_path = './prog_run/'
 
+
+# =============================================================================
+# These functions control the formatting of all the print statements for the 
+# user. They simply take the string to be printed and wrap the text and 
+# allow the messages to be differentiated using symbols.
+# =============================================================================
+def print_info(msg):
+    print('\n')
+    print(''.center(70, '-'))
+    print(textwrap.fill(msg, 70))
+    print(''.center(70, '-'))
+    
+def print_process(msg):
+    print('\n')
+    print(''.center(70, '/'))
+    print(textwrap.fill(msg, 70))
+    print(''.center(70, '\\'))
+    
+def print_checkpoint(msg):
+    print('\n')
+    print(''.center(70, '~'))
+    print(textwrap.fill(msg, 70))
+    print(''.center(70, '~'))
+    
+def print_graph(msg):
+    print('\n')
+    print(''.center(70, '.'))
+    print(textwrap.fill(msg, 70))
+    print(''.center(70, '.'))
+    
+
 # =============================================================================
 # This function allows you to ask a yes or no question which either returns a 
-# counter 'y' or 'n' which you can make use of in other functions when deciding 
-# what to do next i.e. whether you want to exit a while True: loop
+# counter 'y' or 'n'. I use this in other functions when deciding to interact 
+# with the user. I have usually used this to exit a while True: loop
 # =============================================================================
 def yes_or_no(question):
     counter = ''
@@ -24,9 +58,51 @@ def yes_or_no(question):
             counter+='n'
             return counter
         else:
-            print('\n---\nI\'m sorry I don\'t understand... Please enter y/n \
-in the accepted format\n---\n')
-            
+            print_info('I\'m sorry I don\'t understand... Please enter (y\\n) in the accepted format')
+
+# =============================================================================
+# This function allows the user choose from multiple options at once using a 
+# dictionary and integers as keys. This function should only allow the user to 
+# continue when they have entered a valid key.        
+# =============================================================================
+def choose_from_dict(question, dictionary):
+    while True:
+        num_choice=input("\n###\n"+question+"\n###\n")
+        
+        valid_integers = list(dictionary.keys())
+        try:
+            if int(num_choice) in valid_integers:
+                return num_choice, dictionary[int(num_choice)]
+            else:
+                print_info('You have not enetered a valid number. Try again!')
+                
+        except ValueError:
+            print_info('You have not input a valid integer.')
+                        
+# =============================================================================
+# This function allows the user to input a number, either a float or an integer
+# in a specific range of numbers. This function should only allow the user to 
+# continue when they have entered a number or float within in the range specified.
+# =============================================================================
+def check_num(max_len, min_len, question):
+      while True:
+        num_choice=input("\n###\n"+question+"\n###\n")
+        try:
+                num = int(num_choice)
+                if (min_len < int(num_choice) < max_len) == True:
+                      return num
+                else:
+                      print_info(f'The sequence length you have entered is not in the correct range should be between >{max_len}< and >{min_len}<')            
+        except ValueError:
+                try:
+                    num = float(num_choice)
+                    if (min_len < num < max_len) == True:
+                          return num
+                    else:
+                         print_info(f'The sequence length you have entered is not in the correct range should be between >{max_len}< and >{min_len}<')
+                except ValueError:
+                    print_info('You have not entered a number, please try again...')
+        
 
 # =============================================================================
 # This function asks the user to enter a protein family of interest. It will 
@@ -44,33 +120,22 @@ def enter_protein():
                   
                 #Checking that the protein family returns results from NCBI if not then 
                 #there may be spelling mistakes 
-                esearch_cmd = f'esearch -db IPG -query \
-                    "{protein_family}[PROT]" | grep "Count"'
+                esearch_cmd = f'esearch -db IPG -query "{protein_family}[PROT]" | grep "Count"'
                 
                 line =  subprocess.check_output(esearch_cmd, shell=True).decode("utf-8")
                 protein_results = int(line[9:-9])
                 
                 if protein_results == 0:
-                    print('\n')
-                    print(f"\nHi there! Your protein (>{protein_family}<) \
-didn\'t return any results from NCBI...\nThis means you might have made a typo... \n\
-Please try again!\n".center(350, '-'))
+                    print_info(f">{protein_family[0].upper()+protein_family[1:]}< didn\'t return any results from NCBI...This means you might have made a typo... Please try again!")
                               
                 elif 1<= protein_results <= 2:
-                    print('\n')
-                    print(f'\nHi ! NCBI returned >{protein_results}< which \
-isn\'t enough for the subsequent analysis. I\'m sorry about this... \n\
-Please try again!\n'.center(350, '-'))
+                    print_info(f'Hi ! NCBI returned >{protein_results}< which isn\'t enough for the subsequent analysis. I\'m sorry about this... Please try again!')
                         
                 elif protein_results > 2 :
-                    print('\n')
-                    print(f"\nLuckily for you NCBI has returned >{line[9:-9]}< \
-sequence results for your protein family (>{protein_family}<)!\n".center(300, '-'))
-    
+                    print_info(f"Luckily for you NCBI has returned >{line[9:-9]}< sequence results for your protein family (>{protein_family}<)!")
                     break
                 else:
-                    print("Something isn't working please try again...")
-        
+                    print_info("Something isn't working please try again...")
         return protein_family
 
 
@@ -79,221 +144,333 @@ sequence results for your protein family (>{protein_family}<)!\n".center(300, '-
 # the user to continue with the analysis until a combination of protein family 
 # and taxonomic subset returns more than 2 sequences from NCBI. There are points
 # at which if the number of sequences returned is not satisfactory that you are
-# able to enter a different protein family if you wish, starting again...
+# able to enter a different protein family if you wish, after which 
+# you can enter another taxonomic sub-group.
 # =============================================================================
 def enter_organism(protein):
         while True:
                 taxonomic_subset=input("\n###\nWhat taxonomic subset do you wish to investigate?\n###\n").lower()
                 #taxonomic_subset='ascomycete fungi'
                 
-                efilter_cmd = f'esearch -db IPG -query "{protein}[PROT]\
-                    AND {taxonomic_subset}[ORGN]"|grep "Count"'
+                efilter_cmd = f'esearch -db IPG -query "{protein}[PROT] AND {taxonomic_subset}[ORGN]"|grep "Count"'
                 
                 line =  subprocess.check_output(efilter_cmd, shell=True).decode("utf-8")
                 prot_tax_results = int(line[9:-9])
                 
                 if prot_tax_results == 0:
-                    print('\n')
-                    print(f"\nHello, your combination of >{taxonomic_subset}< \
-and >{protein}< didn\'t return any results from NCBI...\nThis means you might \
-have made a typo...\nPlease try entering the taxonomic subgroup again!\n".center(350, '-'))
+                    print_info(f"Hello, your combination of >{taxonomic_subset}< and >{protein}< didn\'t return any results from NCBI...This means you might have made a typo... Please try entering the taxonomic subgroup again!")
                     
                     if yes_or_no('Would you like to enter a different protein family?') == 'y':
                         protein = enter_protein()
                               
                 elif 1 <= prot_tax_results <= 2:
-                    print('\n')
-                    print(f'\nHi ! NCBI returned >{line[9:-9]}< which isn\'t \
-enough for the subsequent analysis.I\'m sorry about this...\n Please try again!\n'.center(350, '-'))
+                    print_info(f'Hi ! NCBI returned >{prot_tax_results}< which isn\'t enough for the subsequent analysis.I\'m sorry about this... Please try again!')
                     
                     if yes_or_no('Would you like to enter a different protein family?') == 'y':
                         protein = enter_protein()
                     
                 elif 2 < prot_tax_results < 1000:
-                    print('\n')
-                    print(f'\nThis program has found >{line[9:-9]}< results \
-within your specified taxa sub-group. We can now continue with the analysis...\n'.center(350, '-'))
+                    print_info(f'This program has found >{prot_tax_results}< results within your specified taxa sub-group. We can now continue with the analysis...')
                     break
                         
                 elif prot_tax_results >= 1000:
-                    print('\n')
-                    print('\nThis is a lot of sequences to get from NCBI and \
-so this may take a while...\n'.center(200, '-')) 
+                    print_info(f'Processing >{prot_tax_results}< may take a while...')
                           
                     if yes_or_no('Would you still like to continue?') == 'y':
-                        print('\n')
-                        print('\nMake yourself a cup of tea!\n'.center(100, '-'))
+                        print_info('Make yourself a cup of tea!')
                         break
                     
                     elif yes_or_no('Would you like to enter a different protein family?')=='y':
                         protein = enter_protein()
         
                 else:
-                    print("Something is going wrong, please try again!")
+                    print_info("Something is going wrong, please try again!")
                                         
         return protein, taxonomic_subset
 
 # =============================================================================
-# Getting rid of partial sequences
+# This function retrieves the fasta sequences for chosen the protein and 
+# taxonomic sub-group. The fasta headers are put in another file. Which is 
+# searched for partial sequences. A file is created with headers of only the complete
+# sequences. A list of these headers is returned.
 # =============================================================================
 def prune_seq(protein, organism, path=output_path):
     
-    print('\nRetrieving sequences...\n'.center(120, '-'))
-    
-    sequence_cmd =f'esearch -db protein -query "{protein}[PROT] AND {organism}[ORGN]"\
-    |efetch -format fasta>{path}file1'
-        
+    print_process('Retrieving sequences...')
+    sequence_cmd =f'esearch -db protein -query "{protein}[PROT] AND {organism}[ORGN]"|efetch -format fasta>{path}file1'
     subprocess.call(sequence_cmd, shell=True)
     
-    print('\nPruning sequences...\n'.center(120, '-'))
-    
+    print_process('Removing partial sequences...')
     fasta_header_cmd = f"grep '>' {path}file1 > {path}headers.txt"
     subprocess.call(fasta_header_cmd, shell=True)
     
     partial_cmd = f'grep -i -v "partial" {path}headers.txt | cut --complement -c 1 > {path}headers_wo_partial.txt'
     subprocess.call(partial_cmd, shell=True)
-        
-    count_cmd = f'wc -l {path}headers_wo_partial.txt'
-    count = str(subprocess.check_output(count_cmd, shell=True))
-    count = count.split(' ')[0][2:]
-
-    if int(count) > 2:
-        
-        pullseq_cmd = f'./pullseq -i {path}file1 -n {path}headers_wo_partial.txt > {path}file_wo_partial'
-        subprocess.call(pullseq_cmd, shell=True)
-        
-        return(int(count))
-            
-    else:
-        print('\nI am so sorry it seems that after removing partial sequences returned by NCBI \
-we don\'t have enough sequences to do a multiple alignment...\n'.center(350, '-'))
-            
-        return(int(count))
-            
-# =============================================================================
-# Number of species        
-# =============================================================================
-def species(prot, orgn):
-    
-    species_cmd = f"esearch -db IPG -query '{prot}[PROT] AND {orgn}[ORGN]'|\
-        esummary|xtract -pattern DocumentSummary -element Organism"
-    
-    species_list = subprocess.check_output(species_cmd, shell=True)
-    print(species_list)
-    species_subset=species_list.split()
     
     with open(f'{output_path}headers_wo_partial.txt') as myfile:
         lines = [line.rstrip() for line in myfile]
-    
-    #species_subset = []
-    
-    
-    #for line in lines:
-    #    species_subset.append(line.split('[')[1][:-1])
-    
+        
+    return lines
+            
+# =============================================================================
+# This function creates a set of the species returned for the chosen protein 
+# and taxonomic subgroup using another NCBI search.
+# =============================================================================
+def species(prot, orgn):
+    species_cmd = f"esearch -db IPG -query '{prot}[PROT] AND {orgn}[ORGN]'|esummary|xtract -pattern DocumentSummary -element Organism"
+    species_list = subprocess.check_output(species_cmd, shell=True).decode("utf-8")
+    species_subset=species_list.split('\n')
     species_number = len(set(species_subset))
     species_set = set(species_subset)
     
-    return lines, species_number, species_set
+    return species_number, species_set
 
-
-# =============================================================================
-# CHOOSING SEQUENCES FROM dict for PATMATMOTIF        
-# =============================================================================
-def choose_from_dict(question, dictionary):
-    while True:
-        num_choice=input("\n###\n"+question+"\n###\n")
-        
-        valid_integers = list(dictionary.keys())
-        
-        if int(num_choice) in valid_integers:
-            break
-        else:
-            print('\nYou have not enetered a valid number\nTry again!\n'.center(300,'-'))
-    return num_choice, dictionary[int(num_choice)]
-            
 # =============================================================================
 # program order
 # =============================================================================
 
-def user_input():
+def user_input(path=output_path):
     try:
         while True:
             subprocess.call('clear', shell=True)
             prot=enter_protein()
             prot2, orgn=enter_organism(prot)
             
-            number = prune_seq(prot2, orgn)
+            headers = prune_seq(prot2, orgn)
             
-            headers, num_spec, set_spec = species(prot2, orgn)
+            num_spec, set_spec = species(prot2, orgn)
             
-            if number > 2 :
+            # If there are enough complete sequences to continue 
+            # with the analysis pullseq is used to create a clustalo input file which 
+            # contains only the complete sequences returned by NCBI. If there are not enough
+            # sequences the user is prompted whether they would like to start again which
+            # would allow them to input a new protein group and subsequently a new taxonomic
+            # sub-group.
+            if len(headers) > 2 :
                 
-                print(f'\nAccording to your input you want to look at the \
-conservation of >{prot2}s< in >{num_spec}< different species... \nPlease be aware \
-with many different species in your analysis you may not get very satisfactory\
-conservation results...\n'.center(450, '-'))
+                pullseq_cmd = f'./pullseq -i {path}file1 -n {path}headers_wo_partial.txt > {path}file_wo_partial'
+                subprocess.call(pullseq_cmd, shell=True)
                 
-                if yes_or_no(f'Would you like to see the {num_spec} species?') == 'y':
+                print_info(f'According to your input you want to look at the conservation of >{prot2}s< in >{num_spec}< different species... Please be aware with many different species in your analysis you may not get very satisfactory\conservation results...')
+                
+                if yes_or_no(f'Would you like to see the >{num_spec}< species?') == 'y':
                     for i in set_spec:
                         print(i)
                 
-                if yes_or_no(f'With this in mind, would you like to continue with \
->{num_spec}< species?') == 'y':
-                    print('\nYay! Let\'s continue with the analysis...\n'.center(250, '~'))
+                if yes_or_no(f'With this in mind, would you like to continue with >{num_spec}< species?') == 'y':
+                    print_checkpoint('Yay! Let\'s continue with the analysis...')
                     return headers, prot2, orgn
                     break 
                 
                 else:
+                    print_info('I am so sorry it seems that after removing partial sequences returned by NCBI we don\'t have enough sequences to do a multiple alignment...')
+                    
                     if yes_or_no('Would you like to start again?') == 'n':
-                        print('\nexiting...\n'.center(250, '~'))
+                        print_checkpoint('exiting...')
                         break
                     else:
-                        print('\nStarting again...\n'.center(250, '~'))
+                        print_checkpoint('Starting again...')
                         
             else:
                 if yes_or_no('Would you like to start again?') == 'n':
-                    print('\nexiting...\n'.center(250, '~'))
+                    print_checkpoint('exiting...')
                     break
                 else:
-                    print('\nStarting again...\n'.center(250, '~'))
+                    print_checkpoint('Starting again...')
                     
     except:
-        print('USER INPUT FUNCTION')
-
-
-
+        print('THE USER INPUT FUNCTION FAILED')
+                
 # =============================================================================
-# 
+# This function provides the user with the option to use a subset of sequences 
+# in the multiple sequence alignment instead of all sequences. 
+# The user is presented with the sequence dataframe and a histogram to get an
+# idea of how many sequences there are of a particular length. 
+# The user can then either remove short or long sequences or choose their own
+# range entirely. 
+# The user can only progress if their range returns more than 2 sequences for
+# the multiple sequence alignment.
 # =============================================================================
-def check_num(max_len, min_len, question):
-      while True:
-        num_choice=input("\n###\n"+question+"\n###\n")
-        try:
-                num = int(num_choice)
-                if (min_len < int(num_choice) < max_len) == True:
-                      return num
-
-                else:
-                      print(f'\nThe sequence length you have entered is not in the correct range\
-                      should be between {max_len} and {min_len}\nTry again!\n'.center(300,'-')) 
-                
-                
-        except ValueError:
-                
-                try:
-                    num = float(num_choice)
-
-                    if (min_len < num < max_len) == True:
-                          return num
-                    else:
-                         print(f'\nThe sequence length you have entered is not in the correct range\
-                          should be between {max_len} and {min_len}\nTry again!\n'.center(300,'-'))
-
-                            
-                            
-                except ValueError:
-                    
-                    print('You have not entered a number, please enter a number...')
-              
+def define_subset(df):
+    print_graph('Plotting a histogram of the sequence lengths')
     
+    plt.hist(df['Sequence Length'], color=('lightgreen'), ec='darkgreen')
+    plt.xlabel('Sequence Length')
+    plt.ylabel('Number of Sequences')
+    plt.title('Sequence Lengths for your Search Query')
+    plt.savefig(output_path+'seq_histogram.pdf', format='pdf')
+    
+    cmd_view_hist = f'gs {output_path}seq_histogram.pdf'
+    subprocess.call(cmd_view_hist, shell=True)
+    
+    
+    my_max = df['Sequence Length'].loc[df['Sequence Length'].idxmax()]      # Maximum in column
+    my_min = df['Sequence Length'].loc[df['Sequence Length'].idxmin()]      # Maximum in column
+    
+    num_seq = len(df.index.tolist())
+    
+    if yes_or_no('Would you like to specify a subset?') == 'n':
+        print_info(f'Continuing with all >{num_seq}< sequences...')
+        seq = df.index.tolist()
+    
+    else: 
+        
+        while True:
+            subset_options = {1:'Specify a subset by removing some of the shorter sequences?', 
+                              2:'Specify a subset by removing some of the longer sequences?',
+                              3:'WSpecify a subset by defining your own range?'}
+            
+            
+            pprint.pprint(subset_options)
+            key, dict_input=choose_from_dict('How would you like to create your subset?', subset_options)
+            
+            print('\n')
+            pprint.pprint(subset_options)
+            
+            if key == '1':
+                num = check_num(my_max, my_min, 'Please enter a minimum sequence length.')
+            
+                subset=df[df['Sequence Length']>num]
+                num_seq = len(subset.index.tolist())
+                
+                seq = subset.index.tolist()
+                
+                if num_seq > 2:
+                    if yes_or_no(f'You have chosen {num_seq} sequences. Would you like to choose a different subset?') == 'n':
+                        print_checkpoint(f'Continuing with this subset of >{num_seq}< sequences!')
+                        break
+                
+                else:
+                    print_info(f'I\'m really sorry but your subset only contains >{num_seq}< sequences and you need at least three to to a multiple sequence alignemnt')
+            
+                
+            if key == '2':
+                num = check_num(my_max, my_min, 'Please enter a maximum sequence length.')
+            
+                subset=df[df['Sequence Length']<num]
+                num_seq = len(subset.index.tolist())
+                seq = subset.index.tolist()
+                
+                
+                if num_seq > 2:
+                    if yes_or_no(f'You have chosen {num_seq} sequences. Would you like to choose a different subset?') == 'n':
+                        print_checkpoint(f'Continuing with this subset of >{num_seq}< sequences!')
+                        break
+                else:
+                    print_info(f'I\'m really sorry but your subset only contains >{num_seq}< sequences and you need at least three to to a multiple sequence alignment')
+                
+            if key == '3':
+                min_num = check_num(my_max, my_min, 'Please enter your minimum sequence length.')
+                max_num = check_num(my_max, my_min, 'Please enter your maximum sequence length.')
+                
+                subset=df[df['Sequence Length'].between(min_num, max_num)]
+                num_seq = len(subset.index.tolist())
+                seq = subset.index.tolist()
+                
+                
+                if num_seq > 2:
+                    if yes_or_no(f'You have chosen {num_seq} sequences. Would you like to choose a different subset?') == 'n':
+                        
+                        print_checkpoint(f'Continuing with this subset of >{num_seq}< sequences!')
+                        break
+                else:
+                    print_info(f'I\'m really sorry but your subset only contains >{num_seq}< sequences and you need at least three to to a multiple sequence alignemnt')
+            
+    return num_seq, seq
+            
+# =============================================================================
+# This function carries out a multiple sequence alignment using Clustal Omega. 
+# Calls a function allowing the user to specify a subset of sequences to 
+# align and then uses pullseq to create an input file with only the sequences 
+# chosen by the user. Clustalo is then run creating specific output files 
+# which are used for further analysis.
+# =============================================================================
+def clustalo(protein, organism, path=output_path):
+    if yes_or_no(f'Would you like to align the sequences you retrived from NCBI for >{protein}< in >{organism}<?') == 'y':
+        
+        with open(f'{output_path}file_wo_partial') as myfile:
+            seq_lines= [line for line in myfile]
+        
+        seq =[]  
+        for i in seq_lines:
+            if '>' in i:
+                seq.append(i.replace('\n','>'))
+            else:
+                seq.append(i)
+            
+        seq=''.join(seq)
+        seq = seq.replace('X', '').replace('\n', '').split('>')[1:]
+        seq_df = pd.DataFrame(seq[1::2], index=seq[::2], columns=['Sequence'])
+        seq_df['Sequence Length'] = seq_df['Sequence'].str.len()
+        seq_df.sort_values(['Sequence Length'], ascending=False, inplace=True)
+        
+        print(seq_df)
+        
+        #Using my function define_subset to return sequences the user wants to look at by length.
+        num_seq, subset_seq = define_subset(seq_df)
+                    
+        seq_file      = []
+        for i in subset_seq:
+            i = i+'\n'
+            seq_file.append(i)               
+        
+        with open(f'{path}msa_in', 'w') as myfile:
+            myfile.writelines(seq_file)
+        
+        pullseq_cmd = f'./pullseq -i {path}file1 -n {path}msa_in>{path}clustalo_in'  
+        subprocess.call(pullseq_cmd, shell = True)
+        cmd = f"clustalo --force --full --threads 16 --outfmt=phy --guidetree-out={path}clustalo.tree -i {path}clustalo_in -o {path}clustalo.phy"
+        subprocess.call(cmd, shell=True)
+        
+        
+# =============================================================================
+# HMOMENT
+# =============================================================================
+def hmoment(seq_dict, path=output_path):
+    print(seq_dict)
+    plt.figure(figsize=(30, 10))
+    counter = 0
+    while True:
+        
+        if yes_or_no('Would you like to add a protein sequence to your hydropathy plot?')=='y':
+            counter += 1
+            pprint.pprint(seq_dict)
+            
+            key, dict_input=choose_from_dict('To create a hydropathy plot enter the number of the sequence', seq_dict)        
+        
+            temp_file_cmd=f'echo {dict_input}>{path}hp_temp_file'
+            pullseq_cmd = f'./pullseq -i {path}file1 -n {path}hp_temp_file > {path}hp_temp_seqs'
+        
+            subprocess.call(temp_file_cmd, shell=True)
+            subprocess.call(pullseq_cmd, shell=True)
+            
+            hp_cmd = f'hmoment {path}hp_temp_seqs -outfile {path}hmom_data'
+            subprocess.call(hp_cmd, shell=True)
+            
+            with open(f'{path}hmom_data') as myfile:
+                to_plot = myfile.read()
+                
+            hmom_plot = to_plot.split('HMOMENT')[1:]
+            
+            leg_label='HMOMENT'+hmom_plot[0].split('\n')[0]    
+            data = [y.split('\t\t') for y in hmom_plot[0].split('\n')[4:-1]]
+            df = pd.DataFrame(data, columns=hmom_plot[0].split('\n')[3].split('\t'))
+            df = df.apply(pd.to_numeric)
+            plt.plot(df['Position'], df['uH'], label=leg_label)
+            
+            plt.xlabel('Position')
+            plt.title('Hydropathy Plots of Protein Sequences')
+            plt.ylabel('uH')
+            plt.legend(loc=1)
+            plt.savefig('hydropathy_plot.pdf', format='pdf')
+            
+            view_hp_cmd = 'gs hydropathy_plot.pdf'
+            subprocess.call(view_hp_cmd, shell=True)
+    
+        else:
+            if counter<1:
+                print_info('We can\'t make a plot without any sequences!')
+            
+            else:
+                break
+        
