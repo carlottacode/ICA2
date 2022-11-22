@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pprint
 import textwrap
 
-print('\n---\nWelcome to ICA2\n---\n')
+
 output_path = './prog_run/'
 
 
@@ -39,6 +39,39 @@ def print_graph(msg):
     print(textwrap.fill(msg, 70))
     print(''.center(70, '.'))
     
+# =============================================================================
+# Create output file
+# =============================================================================
+def log_counter_init():
+    exec_list = []
+    if not os.path.exists('./log_file.txt'):
+        
+        os.mknod('./log_file.txt')
+        os.chmod('./log_file.txt', 744)
+    
+    with open('log_file.txt', 'r+') as myfile:
+        log_string = [line for line in myfile]
+        print(log_string)
+        if log_string == []:
+            myfile.write('Execution: 1\n')
+            log_counter = 1
+            return log_counter
+        else:
+            for i in log_string:
+                if 'Execution:' in i:
+                    exec_list.append(i)
+                    
+            log_counter = int(exec_list[-1].split(' ')[1]) + 1
+            myfile.write('Execution: '+str(log_counter)+"\n")
+            return log_counter
+
+# =============================================================================
+# write to output file
+# =============================================================================
+
+def write_to_log(thing):
+    with open('log_file.txt', 'a') as myfile:
+        myfile.write(thing)
 
 # =============================================================================
 # This function allows you to ask a yes or no question which either returns a 
@@ -65,7 +98,7 @@ def yes_or_no(question):
 # dictionary and integers as keys. This function should only allow the user to 
 # continue when they have entered a valid key.        
 # =============================================================================
-def choose_from_dict(question, dictionary):
+def check_dict(question, dictionary):
     while True:
         num_choice=input("\n###\n"+question+"\n###\n")
         
@@ -103,6 +136,18 @@ def check_num(max_len, min_len, question):
                 except ValueError:
                     print_info('You have not entered a number, please try again...')
         
+# =============================================================================
+# This function makes sure that the user enters a string when prompted for 
+# protein family and taxonomic subset.
+# =============================================================================
+
+def check_string(question):
+    while True:
+        query = input("\n###\n"+question+"\n###\n").lower()
+        if query.replace(' ', '').isalpha():
+            return query
+        else:
+            print_info("You have entered some weird characters - enter characters A-Z only")
 
 # =============================================================================
 # This function asks the user to enter a protein family of interest. It will 
@@ -112,7 +157,7 @@ def check_num(max_len, min_len, question):
 def enter_protein():
         while True:
             
-                protein_family=input("\n###\nWhat protein family are you interested in?\n###\n").lower()
+                protein_family=check_string('What protein family are you interested in?')
                 #protein_family = 'pyruvate dehydrogenase'
                 
                 if protein_family[-1] == 's':
@@ -149,8 +194,7 @@ def enter_protein():
 # =============================================================================
 def enter_organism(protein):
         while True:
-                taxonomic_subset=input("\n###\nWhat taxonomic subset do you wish to investigate?\n###\n").lower()
-                #taxonomic_subset='ascomycete fungi'
+                taxonomic_subset=check_string("What taxonomic subset do you wish to investigate?")
                 
                 efilter_cmd = f'esearch -db IPG -query "{protein}[PROT] AND {taxonomic_subset}[ORGN]"|grep "Count"'
                 
@@ -318,11 +362,11 @@ def define_subset(df):
         while True:
             subset_options = {1:'Specify a subset by removing some of the shorter sequences?', 
                               2:'Specify a subset by removing some of the longer sequences?',
-                              3:'WSpecify a subset by defining your own range?'}
+                              3:'Specify a subset by defining your own range?'}
             
             
             pprint.pprint(subset_options)
-            key, dict_input=choose_from_dict('How would you like to create your subset?', subset_options)
+            key, dict_input=check_dict('How would you like to create your subset?', subset_options)
             
             print('\n')
             pprint.pprint(subset_options)
@@ -409,17 +453,26 @@ def clustalo(protein, organism, path=output_path):
         #Using my function define_subset to return sequences the user wants to look at by length.
         num_seq, subset_seq = define_subset(seq_df)
                     
+        
+        
+        if yes_or_no('Would you like to set a maximum number of sequences to take from this subset?')=='y':
+            max_seqs=check_num(num_seq, 2, 'How many of these sequences would you like to do a multiple sequence alignment on?')
+        else:
+            max_seqs=num_seq
+        
+        
         seq_file      = []
-        for i in subset_seq:
+        for i in subset_seq[0:max_seqs]:
             i = i+'\n'
             seq_file.append(i)               
+        
         
         with open(f'{path}msa_in', 'w') as myfile:
             myfile.writelines(seq_file)
         
         pullseq_cmd = f'./pullseq -i {path}file1 -n {path}msa_in>{path}clustalo_in'  
         subprocess.call(pullseq_cmd, shell = True)
-        cmd = f"clustalo --force --full --threads 16 --outfmt=phy --guidetree-out={path}clustalo.tree -i {path}clustalo_in -o {path}clustalo.phy"
+        cmd = f"clustalo --force --full --threads 16 --outfmt=phy --maxnumseq={max_seqs} --guidetree-out={path}clustalo.tree -i {path}clustalo_in -o {path}clustalo.phy"
         subprocess.call(cmd, shell=True)
         
         
@@ -436,7 +489,7 @@ def hmoment(seq_dict, path=output_path):
             counter += 1
             pprint.pprint(seq_dict)
             
-            key, dict_input=choose_from_dict('To create a hydropathy plot enter the number of the sequence', seq_dict)        
+            key, dict_input=check_dict('To create a hydropathy plot enter the number of the sequence', seq_dict)        
         
             temp_file_cmd=f'echo {dict_input}>{path}hp_temp_file'
             pullseq_cmd = f'./pullseq -i {path}file1 -n {path}hp_temp_file > {path}hp_temp_seqs'
@@ -462,11 +515,11 @@ def hmoment(seq_dict, path=output_path):
             plt.title('Hydropathy Plots of Protein Sequences')
             plt.ylabel('uH')
             plt.legend(loc=1)
-            plt.savefig('hydropathy_plot.pdf', format='pdf')
+            plt.savefig(f'{path}hydropathy_plot.pdf', format='pdf')
             
-            view_hp_cmd = 'gs hydropathy_plot.pdf'
+            view_hp_cmd = f'gs {path}hydropathy_plot.pdf'
             subprocess.call(view_hp_cmd, shell=True)
-    
+            write_to_log(f'Hydropathy plot for {dict_input}: hydropathy_plot.pdf\n')
         else:
             if counter<1:
                 print_info('We can\'t make a plot without any sequences!')

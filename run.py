@@ -10,7 +10,7 @@ from functions import enter_organism
 from functions import yes_or_no
 from functions import species
 from functions import user_input
-from functions import choose_from_dict
+from functions import check_dict
 from functions import prune_seq
 from functions import check_num
 from functions import define_subset
@@ -22,7 +22,8 @@ from functions import print_process
 from functions import print_checkpoint 
 from functions import clustalo
 from functions import hmoment
-
+from functions import log_counter_init
+from functions import write_to_log
 
 subprocess.call('mkdir prog_run', shell=True)
 output_path = './prog_run/'
@@ -34,6 +35,9 @@ if subprocess.check_output('cat ~/.bash_profile | grep edirect', shell=True).dec
         subprocess.call('sh -c "$(wget -q ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh -O -)"', shell=True)
     
 
+    
+
+run_num = log_counter_init()
 
 # =============================================================================
 # GET USER INPUT 
@@ -41,7 +45,7 @@ if subprocess.check_output('cat ~/.bash_profile | grep edirect', shell=True).dec
 try:
     
     headers, prot, orgn = user_input()
-    
+    write_to_log(f'Query: {prot} AND {orgn}\n')
     fseq={}
     for i in range(0, len(headers)):
         fseq[i+1]=headers[i]
@@ -55,6 +59,7 @@ try:
         #         #Infoalign
         # =============================================================================
         try:
+            print('\n')
             cmd = f"infoalign -noname -sequence {output_path}clustalo.phy -outfile {output_path}infoalign_out.txt"
             subprocess.call(cmd, shell=True)
             
@@ -64,6 +69,7 @@ try:
                     infoalign_df.sort_values(['% Change'], inplace=True)
                     infoalign_df.to_csv(f'{output_path}infoalign_out.csv')
             
+            write_to_log('Infoalign Dataframe csv File: infoalign_out.csv\n')
             if yes_or_no('Would you like to see some information about the alignment?') == 'y':
                     print(infoalign_df.head())
                     my_min = infoalign_df['% Change'].loc[infoalign_df['% Change'].idxmin()]
@@ -78,11 +84,17 @@ try:
             # =============================================================================
             try:
                 if yes_or_no('Would you like to continue?') =='y':
-                    plotcon_create_cmd = f"plotcon -winsize 6 -sequence {output_path}clustalo.phy -auto -graph png -stdout"
-                    plotcon_view_cmd = f"plotcon -winsize 6 -sequence {output_path}clustalo.phy -auto -graph x11"
+                    cwd = os.getcwd()
+                    os.chdir(cwd+output_path[1:])
+                    #subprocess.call(f'cd {output_path}|ls', shell=True)
+                    plotcon_create_cmd = "plotcon -winsize 6 -sequence clustalo.phy -auto -graph png -stdout"
                     subprocess.call(plotcon_create_cmd, shell=True)
-                    subprocess.call(plotcon_view_cmd, shell=True)
+                    #subprocess.call('cd ..', shell=True)
+                    os.chdir(cwd)
                     
+                    plotcon_view_cmd = f"plotcon -winsize 6 -sequence {output_path}clustalo.phy -auto -graph x11"
+                    subprocess.call(plotcon_view_cmd, shell=True)
+                    write_to_log('Plotcon Graph: Plotcon.1.png\n')
                     print_info('If there were regions in the protein sequences which appeared to be highly conserved there may be specific domains or motifs present in this group of proteins... Let\'s explore this further.')
                     
                     # =============================================================================
@@ -96,13 +108,14 @@ try:
                                 subprocess.call(cons_cmd, shell=True)
                                 pat_cmd = f"patmatmotifs {output_path}cons_seq {output_path}{(prot[:5]+'_'+orgn[:5]).replace(' ', '')}_con.motif"
                                 subprocess.call(pat_cmd, shell=True)
+                                write_to_log(f"PROSITE database search for consensus sequence: {(prot[:5]+'_'+orgn[:5]).replace(' ', '')}_con.motif\n")
                             
                             while True:
                                 if yes_or_no('Would you like to run a different sequence through the PROSITE database?') =='y':
                                     
-                                    
+            
                                     pprint.pprint(fseq)
-                                    key, dict_input=choose_from_dict('Enter a number of the sequence you wish to feed into the PROSITE database...', fseq)        
+                                    key, dict_input=check_dict('Enter a number of the sequence you wish to feed into the PROSITE database...', fseq)        
                             
                                     temp_file_cmd=f'echo {dict_input}>{output_path}temp_file'
                                     pullseq_cmd = f'./pullseq -i {output_path}file1 -n {output_path}temp_file > {output_path}temp_file2'
@@ -113,6 +126,7 @@ try:
                                     subprocess.call(pullseq_cmd, shell=True)
                                     subprocess.call(remove_line_cmd, shell=True)
                                     subprocess.call(patmatmotif_cmd, shell=True)
+                                    write_to_log(f'PROSITE database search for {dict_input} sequence: seq_{key}.motif\n')
                                 else:
                                     break
                         
@@ -120,7 +134,7 @@ try:
                         # Phylogenetic tree
                         # =============================================================================
                         try:
-                            if yes_or_no('Would you like to see the tree of proetin sequences you parsed into the multiple sequence aligner?') =='y':
+                            if yes_or_no('Would you like to see the tree of protein sequences you parsed into the multiple sequence aligner?') =='y':
                                 accn = []
                                 full_header=[]
                                 
@@ -145,31 +159,52 @@ try:
                                     myfile.write(tree)
                                     
                                 cmd_create_tree = f"figtree -graphic PDF {output_path}outtree {output_path}outtree.pdf"
-                                cmd_view_tree = f'ghostscript {output_path}outtree.pdf'
+                                cmd_view_tree = f'gs -q {output_path}outtree.pdf'
                                 subprocess.call(cmd_create_tree, shell=True)
                                 subprocess.call(cmd_view_tree, shell=True)
-                                
+                                write_to_log('Phylogenetic tree for sequence subset: outtree.pdf\n')
                             # =============================================================================
                             # HMOMENT      
                             # =============================================================================
                             try:
                                 hmoment(fseq)
+                               
+                                try:
+                                    dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                                    subprocess.call(dir_cmd, shell=True)
+                                    print_info('You have reached the end of this program. Feel free to run it again with a different query! All the outouts have been saved and detailed in your log file which should be located in the directory in which you ran this program. Enjoy your day.')
+                                except:
+                                    print('Something went wrong renaming the directory')
+                                    dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                                    subprocess.call(dir_cmd, shell=True)
                             except:
                                 print('Something went wrong trying to use hmoment... Please try again')
+                                dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                                subprocess.call(dir_cmd, shell=True)
                         except:
-                            print('Phylogenetic tree didn\'t work')    
+                            print('Phylogenetic tree didn\'t work')   
+                            dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                            subprocess.call(dir_cmd, shell=True)
                         
                     except:
                         print('Something went wrong trying to use patmatmotifs... Please try again')
+                        dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                        subprocess.call(dir_cmd, shell=True)
             except:
-                print('Something went wrong trying to use plotcon... Please try again')    
+                print('Something went wrong trying to use plotcon... Please try again')
+                dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+                subprocess.call(dir_cmd, shell=True)
             
         except:
-            print('Something went wrong trying to use infoalign... Please try again')     
+            print('Something went wrong trying to use infoalign... Please try again')  
+            dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+            subprocess.call(dir_cmd, shell=True)
     
                 
     except:
         print('Seomthing went wrong with using clustalo... Please try again')
+        dir_cmd = f"mv {output_path} {(prot[:10]+'_'+orgn[:10]).replace(' ', '')}_run_{run_num}"
+        subprocess.call(dir_cmd, shell=True)
     
 except:
     print('Something went wrong with the user input... Please try again')
